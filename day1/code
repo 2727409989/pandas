@@ -1,1 +1,12 @@
+#列表表达式还支持多层嵌套，如下面的例子中第一个 for 为外层循环，第二个为内层循环：
+In [6]: [m+'_'+n for m in ['a', 'b'] for n in ['c', 'd']]
+Out[6]: ['a_c', 'a_d', 'b_c', 'b_d']
 
+#条件赋值
+In [7]: value = 'cat' if 2>1 else 'dog'
+In [8]: value
+Out[8]: 'cat'
+
+#下面举一个例子，截断列表中超过5的元素
+list = [i for i in range(1,8)]                #list=[1, 2, 3, 4, 5, 6, 7]
+[i if i <= 5 else 5 for i in L]               #Out: [1, 2, 3, 4, 5, 5, 5]
