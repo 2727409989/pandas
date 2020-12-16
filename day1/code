@@ -1,7 +1,3 @@
-#列表表达式还支持多层嵌套，如下面的例子中第一个 for 为外层循环，第二个为内层循环：
-In [6]: [m+'_'+n for m in ['a', 'b'] for n in ['c', 'd']]
-Out[6]: ['a_c', 'a_d', 'b_c', 'b_d']
-
 #条件赋值
 In [7]: value = 'cat' if 2>1 else 'dog'
 In [8]: value
@@ -10,3 +6,357 @@ Out[8]: 'cat'
 #下面举一个例子，截断列表中超过5的元素
 list = [i for i in range(1,8)]                #list=[1, 2, 3, 4, 5, 6, 7]
 [i if i <= 5 else 5 for i in L]               #Out: [1, 2, 3, 4, 5, 5, 5]
+
+
+
+练习一
+In [138]: M1 = np.random.rand(2,3)
+
+In [139]: M2 = np.random.rand(3,4)
+
+In [140]: res = np.empty((M1.shape[0],M2.shape[1]))
+
+In [141]: for i in range(M1.shape[0]):
+   .....:     for j in range(M2.shape[1]):
+   .....:         item = 0
+   .....:         for k in range(M1.shape[1]):
+   .....:             item += M1[i][k] * M2[k][j]
+   .....:         res[i][j] = item
+   .....: 
+
+In [142]: ((M1@M2 - res) < 1e-15).all() # 排除数值误差
+Out[142]: True
+三重循环改写为列表推导式的形式。
+
+
+答案：
+
+In [4]: M1 = np.random.rand(2,3)
+
+In [5]: M2 = np.random.rand(3,4)
+
+In [6]: res = [[sum([M1[i][k] * M2[k][j] for k in range(M1.shape[1])]) for j in range(M2.shape[1])] for i in range(M1.shape[0])]
+
+
+所想到的
+
+1、关于列表推导式 多个for循环连写 哪个for循环为外层嵌套
+
+[m+'_'+n for m in ['a', 'b'] for n in ['c', 'd']]    第一个for为外层
+['a_c', 'a_d', 'b_c', 'b_d']
+
+
+[     [ m+'_'+n for m in ['a', 'b'] ]       for n in ['c', 'd']]     将前面的中括号看成一个fx 所以后面第二个for为外层
+[['a_c', 'b_c'], ['a_d', 'b_d']]
+
+
+2、python中sum函数用法
+
+
+练习二
+
+设矩阵 Am×n ，现在对 A 中的每一个元素进行更新生成矩阵 B ，更新方法是 Bij=Aij ∑k=1n 1/Aik ，例如下面的矩阵为 A ，则 B2,2=5×(1/4+1/5+1/6)=37/12 ，请利用 Numpy 高效实现。
+A = np.arange(1,10).reshape(3,-1)
+array([[1, 2, 3],
+       [4, 5, 6],
+       [7, 8, 9]])
+
+#更新矩阵答案
+B = A*(1/A).sum(1).reshape(-1,1)
+array([[1.83333333, 3.66666667, 5.5       ],
+       [2.46666667, 3.08333333, 3.7       ],
+       [2.65277778, 3.03174603, 3.41071429]])
+       
+
+遇到的问题     
+numpy中sum用法
+sum(0)  sum(1)返回值都为一行n列  在进行矩阵相乘时要reshape（相乘时会自动广播）
+
+
+#数据格式      
+(1/A).sum(1) 
+ array([1.83333333, 0.61666667, 0.37896825])
+ 
+ (1/A).sum(0)
+ array([1.39285714, 0.825     , 0.61111111])
+ 
+ (1/A).sum(1).reshape(-1,1)
+ array([[1.83333333],
+       [0.61666667],
+       [0.37896825]])
+       
+
+
+练习四
+重要
+改进矩阵计算的性能
+设 Z 为 m×n 的矩阵， B 和 U 分别是 m×p 和 p×n 的矩阵， Bi 为 B 的第 i 行， Uj 为 U 的第 j 列，下面定义 R=∑i=1m∑j=1n∥Bi−Uj∥22Zij ，其中 ∥a∥22 表示向量 a 的分量平方和 ∑ia2i 。
+
+现有某人根据如下给定的样例数据计算 R 的值，请充分利用 Numpy 中的函数，基于此问题改进这段代码的性能。
+
+In [145]: np.random.seed(0)
+
+In [146]: m, n, p = 100, 80, 50
+
+In [147]: B = np.random.randint(0, 2, (m, p))
+
+In [148]: U = np.random.randint(0, 2, (p, n))
+
+In [149]: Z = np.random.randint(0, 2, (m, n))
+In [150]: def solution(B=B, U=U, Z=Z):
+   .....:     L_res = []
+   .....:     for i in range(m):
+   .....:         for j in range(n):
+   .....:             norm_value = ((B[i]-U[:,j])**2).sum()
+   .....:             L_res.append(norm_value*Z[i][j])
+   .....:     return sum(L_res)
+   .....: 
+
+In [151]: solution(B, U, Z)
+Out[151]: 100566
+
+
+
+
+改进方法：
+
+令 Yij=∥Bi−Uj∥22 ，则 R=∑i=1m∑j=1nYijZij ，这在 Numpy 中可以用逐元素的乘法后求和实现，因此问题转化为了如何构造 Y 矩阵。
+
+Yij=∥Bi−Uj∥22=∑k=1p(Bik−Ukj)2=∑k=1pB2ik+∑k=1pU2kj−2∑k=1pBikUkj
+从上式可以看出，第一第二项分别为 B 的行平方和与 U 的列平方和，第三项是两倍的内积。因此， Y 矩阵可以写为三个部分，第一个部分是 m×n 的全 1 矩阵每行乘以 B 对应行的行平方和，第二个部分是相同大小的全 1 矩阵每列乘以 U 对应列的列平方和，第三个部分恰为 B 矩阵与 U 矩阵乘积的两倍。从而结果如下：
+
+In [23]: (((B**2).sum(1).reshape(-1,1) + (U**2).sum(0) - 2*B@U)*Z).sum()
+Out[23]: 100566
+向量化语言可进行反向传播
+
+
+
+np数组的构造
+最一般的方法是通过 array 来构造
+In [29]: import numpy as np
+
+In [30]: np.array([1,2,3])
+Out[30]: array([1, 2, 3])
+下面讨论一些特殊数组的生成方式：
+
+【a】等差序列： np.linspace, np.arange
+
+In [31]: np.linspace(1,5,11) # 起始、终止（包含）、样本个数
+Out[31]: array([1. , 1.4, 1.8, 2.2, 2.6, 3. , 3.4, 3.8, 4.2, 4.6, 5. ])
+
+In [32]: np.arange(1,5,2) # 起始、终止（不包含）、步长
+Out[32]: array([1, 3])
+【b】特殊矩阵： zeros, eye, full
+
+In [33]: np.zeros((2,3)) # 传入元组表示各维度大小
+Out[33]: 
+array([[0., 0., 0.],
+       [0., 0., 0.]])
+
+In [34]: np.eye(3) # 3*3的单位矩阵
+Out[34]: 
+array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]])
+
+In [35]: np.eye(3, k=1) # 偏移主对角线1个单位的伪单位矩阵
+Out[35]: 
+array([[0., 1., 0.],
+       [0., 0., 1.],
+       [0., 0., 0.]])
+
+In [36]: np.full((2,3), 10) # 元组传入大小，10表示填充数值
+Out[36]: 
+array([[10, 10, 10],
+       [10, 10, 10]])
+
+In [37]: np.full((2,3), [1,2,3]) # 通过传入列表填充每列的值
+Out[37]: 
+array([[1, 2, 3],
+       [1, 2, 3]])
+【c】随机矩阵： np.random
+
+最常用的随机生成函数为 rand, randn, randint, choice ，它们分别表示0-1均匀分布的随机数组、标准正态的随机数组、随机整数组和随机列表抽样：
+
+In [38]: np.random.rand(3) # 生成服从0-1均匀分布的三个随机数
+Out[38]: array([0.33475955, 0.95078732, 0.05285509])
+
+In [39]: np.random.rand(3, 3) # 注意这里传入的不是元组，每个维度大小分开输入
+Out[39]: 
+array([[0.1188322 , 0.51993935, 0.73054809],
+       [0.97169376, 0.72724319, 0.84687781],
+       [0.18001319, 0.8011098 , 0.05113275]])
+对于服从区间 a 到 b 上的均匀分布可以如下生成：
+
+In [40]: a, b = 5, 15
+
+In [41]: (b - a) * np.random.rand(3) + a
+Out[41]: array([ 9.67438882, 12.49445466,  6.51381903])
+randn 生成了 N(0,I) 的标准正态分布：
+
+In [42]: np.random.randn(3)
+Out[42]: array([ 0.91321097, -0.02203455,  0.44235296])
+
+In [43]: np.random.randn(2, 2)
+Out[43]: 
+array([[ 0.49897634, -1.57842429],
+       [-0.09213398,  0.00613158]])
+对于服从方差为 σ2 均值为 μ 的一元正态分布可以如下生成：
+
+In [44]: sigma, mu = 2.5, 3
+
+In [45]: mu + np.random.randn(3) * sigma
+Out[45]: array([5.89540275, 2.56563403, 1.56208693])
+randint 可以指定生成随机整数的最小值最大值（不包含）和维度大小：
+
+In [46]: low, high, size = 5, 15, (2,2) # 生成5到14的随机整数
+
+In [47]: np.random.randint(low, high, size)
+Out[47]: 
+array([[ 7,  9],
+       [13,  7]])
+choice 可以从给定的列表中，以一定概率和方式抽取结果，当不指定概率时为均匀采样，默认抽取方式为有放回抽样：
+
+In [48]: my_list = ['a', 'b', 'c', 'd']
+
+In [49]: np.random.choice(my_list, 2, replace=False, p=[0.1, 0.7, 0.1 ,0.1])
+Out[49]: array(['b', 'd'], dtype='<U1')
+
+In [50]: np.random.choice(my_list, (3,3))
+Out[50]: 
+array([['a', 'c', 'd'],
+       ['d', 'b', 'c'],
+       ['d', 'c', 'a']], dtype='<U1')
+当返回的元素个数与原列表相同时，等价于使用 permutation 函数，即打散原列表：
+
+In [51]: np.random.permutation(my_list)
+Out[51]: array(['d', 'c', 'a', 'b'], dtype='<U1')
+最后，需要提到的是随机种子，它能够固定随机数的输出结果：
+
+In [52]: np.random.seed(0)
+
+In [53]: np.random.rand()
+Out[53]: 0.5488135039273248
+
+In [54]: np.random.seed(0)
+
+In [55]: np.random.rand()
+Out[55]: 0.5488135039273248
+
+
+
+
+
+
+
+
+
+
+
+
+np数组的变形与合并
+【a】转置： T
+
+In [56]: np.zeros((2,3)).T
+Out[56]: 
+array([[0., 0.],
+       [0., 0.],
+       [0., 0.]])
+
+
+合并操作： r_, c_
+
+对于二维数组而言， r_ 和 c_ 分别表示上下合并和左右合并：
+In [57]: np.r_[np.zeros((2,3)),np.zeros((2,3))]
+Out[57]: 
+array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]])
+
+In [58]: np.c_[np.zeros((2,3)),np.zeros((2,3))]
+Out[58]: 
+array([[0., 0., 0., 0., 0., 0.],
+       [0., 0., 0., 0., 0., 0.]])
+
+一维数组和二维数组进行合并时，应当把其视作列向量，在长度匹配的情况下只能够使用左右合并的 c_ 操作：
+In [59]: try:
+   ....:     np.r_[np.array([0,0]),np.zeros((2,1))]
+   ....: except Exception as e:
+   ....:     Err_Msg = e
+   ....: 
+
+In [60]: Err_Msg
+Out[60]: ValueError('all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)')
+
+In [61]: np.r_[np.array([0,0]),np.zeros(2)]
+Out[61]: array([0., 0., 0., 0.])
+
+In [62]: np.c_[np.array([0,0]),np.zeros((2,3))]
+Out[62]: 
+array([[0., 0., 0., 0.],
+       [0., 0., 0., 0.]])
+
+
+
+
+
+维度变换： reshape
+
+reshape 能够帮助用户把原数组按照新的维度重新排列。在使用时有两种模式，分别为 C 模式和 F 模式，分别以逐行和逐列的顺序进行填充读取。
+
+
+In [63]: target = np.arange(8).reshape(2,4)
+
+In [64]: target
+Out[64]: 
+array([[0, 1, 2, 3],
+       [4, 5, 6, 7]])
+
+In [65]: target.reshape((4,2), order='C') # 按照行读取和填充
+Out[65]: 
+array([[0, 1],
+       [2, 3],
+       [4, 5],
+       [6, 7]])
+
+In [66]: target.reshape((4,2), order='F') # 按照列读取和填充
+Out[66]: 
+array([[0, 2],
+       [4, 6],
+       [1, 3],
+       [5, 7]])
+
+
+由于被调用数组的大小是确定的， reshape 允许有一个维度存在空缺，此时只需填充-1即可：
+In [67]: target.reshape((4,-1))
+Out[67]: 
+array([[0, 1],
+       [2, 3],
+       [4, 5],
+       [6, 7]])
+
+
+
+下面将 n*1 大小的数组转为1维数组的操作是经常使用的：
+In [68]: target = np.ones((3,1))
+
+In [69]: target
+Out[69]: 
+array([[1.],
+       [1.],
+       [1.]])
+
+In [70]: target.reshape(-1)
+Out[70]: array([1., 1., 1.])
+
+
+
+
+
+
+
+
+
+
+
